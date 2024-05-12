@@ -24,7 +24,10 @@ class finnomenaAPI:
 
         # Initialize
         self.session = requests.Session()
-        self.is_login = self.check_login_status()
+
+    @property
+    def is_login(self):
+        return self.check_login_status()
 
     def login(self):
         """
@@ -35,7 +38,7 @@ class finnomenaAPI:
         """
         # check if not already logged in
         if self.is_login:
-            return self.is_login
+            return True
 
         # check if email is provided
         if self.email is None:
@@ -66,9 +69,8 @@ class finnomenaAPI:
             'https://auth.finnomena.com/api/web/login', data=json.dumps(data))
 
         if not response.ok:
+            self.password = None
             raise Exception("email or password is incorrect")
-            self.is_login = False
-            return self.is_login
 
         response = response.json()
         response = self.session.get(response['data']['redirect_to'])
@@ -80,12 +82,11 @@ class finnomenaAPI:
         self.session.cookies = jar
 
         # Test if login successful ----------------
-        self.is_login = self.check_login_status()
         if not self.is_login:
             raise Exception('Login unsuccessful')
 
         print("successfully logged in")
-        return self.is_login
+        return True
 
     def check_login_status(self):
         """
@@ -94,17 +95,13 @@ class finnomenaAPI:
         Returns:
             login (bool): the login status (True = logged in, False = not logged in)
         """
+        if self.email is None:
+            return False
+
         response = self.session.get(
             'https://www.finnomena.com/fn3/api/auth/profile')
-        if self.email is None:
-            login = False
-        else:
-            if self.email in response.text:
-                login = True
-            else:
-                login = False
 
-        return login
+        return self.email in response.text
 
     def get_fund_list(self):
         """
