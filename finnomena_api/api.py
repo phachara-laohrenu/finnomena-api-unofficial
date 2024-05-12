@@ -1,14 +1,13 @@
+import getpass
 import json
+from urllib.parse import urlparse, parse_qs
 
 import requests
 import pandas as pd
-import getpass
 import numpy as np
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse, parse_qs
 
 from finnomena_api.utils import remove_nonEng
-
 from finnomena_api.keys import keys
 
 
@@ -42,16 +41,18 @@ class finnomenaAPI:
 
         # check if email is provided
         if self.email is None:
-            print("The action requires permission to access your Finnomena account. Please provide login information.")
+            print('The action requires permission to access your Finnomena account. '
+                  'Please provide login information.')
             self.email = input('Email: ')
             self.password = str(getpass.getpass('Password: '))
 
         # check if password is provided:
         if self.password is None:
-            print("The action requires permission to access your Finnomena account. Please provide password for account with email: " + self.email)
+            print('The action requires permission to access your Finnomena account. '
+                  'Please provide password for account with email: ' + self.email)
             self.password = str(getpass.getpass('Password: '))
 
-        print("Logging in to account: " + self.email + ' . . . . .')
+        print('Logging in to account: ' + self.email + ' . . . . .')
 
         params = (
             ('return_url', 'https://www.finnomena.com/'),
@@ -63,14 +64,17 @@ class finnomenaAPI:
         url = urlparse(response.url)
         challenge = parse_qs(url.query)['challenge'][0]
         # -----------------------------------
-        data = {"email": self.email, "password": str(
-            self.password), "challenge": challenge}
+        data = {
+            'email': self.email,
+            'password': str(self.password),
+            'challenge': challenge
+        }
         response = self.session.post(
             'https://auth.finnomena.com/api/web/login', data=json.dumps(data))
 
         if not response.ok:
             self.password = None
-            raise Exception("email or password is incorrect")
+            raise Exception('email or password is incorrect')
 
         response = response.json()
         response = self.session.get(response['data']['redirect_to'])
@@ -85,7 +89,7 @@ class finnomenaAPI:
         if not self.is_login:
             raise Exception('Login unsuccessful')
 
-        print("successfully logged in")
+        print('Successfully logged in')
         return True
 
     def check_login_status(self):
@@ -142,8 +146,9 @@ class finnomenaAPI:
 
         sec_name_found = soup.find(id='sec-name')
         if sec_name_found is None:
-            raise ValueError("Cannot find fund with name '" + sec_name +
-                             "'. Check the list of available funds by method get_fund_list() or make sure fund's code name is spelled correctly")
+            raise ValueError(f"Cannot find fund with name '{sec_name}'. "
+                             'Check the list of available funds by method get_fund_list() '
+                             "or make sure fund's code name is spelled correctly")
         sec_name_found = sec_name_found.text
 
         feeder_fund = soup.find(class_='feeder-fund')
@@ -192,10 +197,12 @@ class finnomenaAPI:
         **This function does NOT require logging in.**
 
         Args:
-            sec_name (str): the fund's code name (e.g. KT-WTAI-A, TMBCOF)
-            time_range (str, optional): time frame to get the fund's price. 
-                                        E.g. setting time_range = '1Y' will return the price of the fund since a year ago until today. 
-                                        If not given, it will return all of the available data (price since inception)
+            sec_name (str):
+                the fund's code name (e.g. KT-WTAI-A, TMBCOF)
+            time_range (str, optional):
+                time frame to get the fund's price. E.g. setting time_range = '1Y' will return the
+                price of the fund since a year ago until today. If not given, it will return all of
+                the available data (price since inception)
 
         Returns:
             price (pandas.Dataframe): a dataframe of fund's price in timeseries 
@@ -214,8 +221,10 @@ class finnomenaAPI:
             raise ValueError(
                 'time_range is not valid. The options are ' + ', '.join(time_range_option))
 
-        payload = {'range':  time_range,
-                   'fund': mstar_id}
+        payload = {
+            'range': time_range,
+            'fund': mstar_id
+        }
         url = self.keys['url']['fund_timeseries_price']
         temp_data = requests.get(url, params=payload).json()
 
@@ -269,13 +278,16 @@ class finnomenaAPI:
             }
 
         result_dict = {
-            'overall_account_gain': overall_account_gain, 'ports_info': ports_info}
+            'overall_account_gain': overall_account_gain,
+            'ports_info': ports_info
+        }
 
         return result_dict
 
     def get_port_status(self, port_name):
         """
-        A function to get a current status of a portfolio under the given finnomena account. The 'status' are:
+        A function to get a current status of a portfolio under the given finnomena account.
+        The 'status' are:
         1. overall value and gain/loss of the port
         2. historical data (value/cost) of the port
         3. the assets within the port and their prices
@@ -286,7 +298,8 @@ class finnomenaAPI:
             port_name (str): the name of the portfolio to get the status
 
         Returns:
-            overall (dict): a dictionary containing the currentoverall value and gain/loss of the port
+            overall (dict): a dictionary containing the currentoverall value and gain/loss of the
+            port
             historical_value (pandas.DataFrame): a dataframe of historical data of the port
             compositions (pandas.DataFrame): a dataframe of the assets within the port
         """
@@ -295,10 +308,10 @@ class finnomenaAPI:
         # Check if port_name valid
         account_status = self.get_account_status()
         ports_info = account_status['ports_info']
-        if port_name not in ports_info.keys():
+        if port_name not in ports_info:
             ports_name_str = ', '.join(list(ports_info.keys()))
             raise ValueError(
-                "Invalid port_name. Available ports for this account are: " + ports_name_str)
+                'Invalid port_name. Available ports for this account are: ' + ports_name_str)
 
         port_info = ports_info[port_name]
 
@@ -311,13 +324,16 @@ class finnomenaAPI:
         response = response.json()
 
         # Overal port's status
+        pl_info = response['PLInfo']
         overall = {
-            'market_value': response['PLInfo']['unrealized_pl']['sum_of_market_value'],
-            'total_gain':  float(response['PLInfo']['total_realized_amount']) + float(response['PLInfo']['unrealized_pl']['sum_of_unrealized_pl']),
-            'realized_gain': response['PLInfo']['total_realized_amount'],
-            'unrealized_gain': response['PLInfo']['unrealized_pl']['sum_of_unrealized_pl'],
-            'dividend': response['PLInfo']['dividend_amount'],
-            'trading_gain': float(response['PLInfo']['realized_amount']) + float(response['PLInfo']['unrealized_pl']['sum_of_unrealized_pl'])
+            'market_value': pl_info['unrealized_pl']['sum_of_market_value'],
+            'total_gain':  float(pl_info['total_realized_amount']) + \
+                float(pl_info['unrealized_pl']['sum_of_unrealized_pl']),
+            'realized_gain': pl_info['total_realized_amount'],
+            'unrealized_gain': pl_info['unrealized_pl']['sum_of_unrealized_pl'],
+            'dividend': pl_info['dividend_amount'],
+            'trading_gain': float(pl_info['realized_amount']) + \
+                float(pl_info['unrealized_pl']['sum_of_unrealized_pl'])
         }
 
         # Port's historical data
@@ -329,10 +345,14 @@ class finnomenaAPI:
         compositions = pd.DataFrame(response['outstandingData'])
         compositions = compositions.drop(
             columns=['agent', 'full_name_th', 'uid'])
-        compositions = compositions.rename(columns={'asset_code': 'sec_name', 'avg_proce': 'avg_cost',
-                                                    'market_price': 'current_nav', 'profit': 'return',
-
-                                                    'unit_cost': 'total_unit'})
+        compositions = compositions.rename(
+            columns={
+                'asset_code': 'sec_name',
+                'avg_proce': 'avg_cost',
+                'market_price': 'current_nav',
+                'profit': 'return',
+                'unit_cost': 'total_unit'
+            })
         return overall, historical_value, compositions
 
     def get_order_history(self, port_name):
@@ -352,10 +372,10 @@ class finnomenaAPI:
         # Check if port_name valid
         account_status = self.get_account_status()
         ports_info = account_status['ports_info']
-        if port_name not in ports_info.keys():
+        if port_name not in ports_info:
             ports_name_str = ', '.join(list(ports_info.keys()))
             raise ValueError(
-                "Invalid port_name. Available ports for this account are: " + ports_name_str)
+                'Invalid port_name. Available ports for this account are: ' + ports_name_str)
 
         port_info = ports_info[port_name]
 
@@ -367,7 +387,7 @@ class finnomenaAPI:
             payload = {
                 'plan': port_info['plan_slot'],
                 'agent_account_id': str(port_info['nomura_id']),
-                'url': '/tws/order-history/' + str(port_info['nomura_id']) + '?page=' + str(page_number)
+                'url': f"/tws/order-history/{port_info['nomura_id']}?page={page_number}"
             }
 
             response = self.session.get(
@@ -389,5 +409,5 @@ class finnomenaAPI:
         Only for testing. 
         """
         jar = requests.cookies.RequestsCookieJar()
-        jar.set('access_token', "0000000000000")
+        jar.set('access_token', '0000000000000')
         self.session.cookies = jar
